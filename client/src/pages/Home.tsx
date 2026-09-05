@@ -9,6 +9,7 @@ import {
   Menu,
   MoveRight,
   Plus,
+  Share2,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -172,7 +173,7 @@ function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="site-shell">
       <Header />
-      <main>{children}</main>
+      <main className="page-transition">{children}</main>
       <Footer />
     </div>
   );
@@ -337,6 +338,7 @@ function GallerySection() {
             <img src={lightbox.image} alt={lightbox.title} />
             <div className="lightbox-caption"><div><strong>{lightbox.title}</strong><span>{lightbox.category} · {lightbox.year}</span></div><Link href={`/projects/${lightbox.slug}`} onClick={() => setLightbox(null)}>View project <ArrowUpRight size={16} /></Link></div>
           </div>
+          {filtered.length > 1 && <div className="swipe-hint"><span>←</span> Swipe to explore <span>→</span></div>}
         </div>
       )}
     </>
@@ -443,6 +445,18 @@ export function ProjectDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const project = projects.find((item) => item.slug === slug) ?? projects[0];
   const related = projects.filter((item) => item.slug !== project.slug).slice(0, 2);
+  const [shareStatus, setShareStatus] = useState("");
+  const shareUrl = typeof window !== "undefined" ? window.location.href : `/projects/${project.slug}`;
+  const shareTitle = `${project.title} — LUXH Works`;
+  const handleShare = async () => {
+    if (navigator.share) {
+      await navigator.share({ title: shareTitle, text: project.description, url: shareUrl });
+      return;
+    }
+    await navigator.clipboard?.writeText(shareUrl);
+    setShareStatus("Link copied");
+    window.setTimeout(() => setShareStatus(""), 1800);
+  };
   return (
     <PageShell>
       <section className="project-detail-hero"><Link href="/projects" className="back-link"><ChevronLeft size={17} /> All projects</Link><p className="eyebrow">{project.category} / {project.year}</p><h1>{project.title}</h1><div className="project-detail-meta"><div><span>Location</span><p>{project.location}</p></div><div><span>Client</span><p>{project.client}</p></div><div><span>Scope</span><p>{project.note}</p></div></div></section>
@@ -450,7 +464,9 @@ export function ProjectDetailPage() {
       <section className="project-narrative"><div><SectionLabel number="Project story">A deliberate response</SectionLabel></div><div><p className="large-copy">{project.description}</p><p>Every project begins with a close reading of its context—the site, the brief, the people who will use it. We turn those findings into a clear design language, testing each decision against the experience it creates.</p><p>Here, a limited palette and a sequence of framed openings became the foundation for an atmosphere that is both composed and generous.</p></div></section>
       <section className="project-detail-gallery">{project.gallery.map((image, index) => <figure key={image} className={index === 0 ? "project-detail-gallery-featured" : ""}><img src={image} alt={`${project.title} detail ${index + 1}`} /><figcaption>{index === 0 ? "Material and proportion" : index === 1 ? "Atmosphere study" : "A considered frame"}</figcaption></figure>)}</section>
       <section className="project-resources"><div><SectionLabel number="Project resources">Drawings & documentation</SectionLabel><h2>See the thinking<br /><em>behind the frame.</em></h2></div><div className="resource-actions"><a href={project.floorPlan} target="_blank" rel="noreferrer" className="resource-card"><span>01 / Drawing</span><strong>Floor plan</strong><small>Open plan →</small></a><a href={project.pdf} download className="resource-card resource-card-accent"><span>02 / Document</span><strong>Project PDF</strong><small>Download PDF →</small></a></div></section>
+      <section className="project-sharing"><div><SectionLabel number="Share project">Pass it on</SectionLabel><p>Know someone who would enjoy this direction?</p></div><div className="share-actions"><button type="button" onClick={handleShare}><Share2 size={15} />{shareStatus || "Share"}</button><a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a><a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer">Facebook <ArrowUpRight size={14} /></a></div></section>
       <section className="related"><SectionLabel number="Related work">Continue exploring</SectionLabel><div className="related-grid">{related.map((item) => <ProjectCard key={item.slug} project={item} />)}</div></section>
+      <section className="project-end-cta"><p>Like the direction?</p><h2>Start a similar<br /><em>project with us.</em></h2><Link href="/contact" className="button button-light">Begin a conversation <ArrowUpRight size={17} /></Link></section>
     </PageShell>
   );
 }
