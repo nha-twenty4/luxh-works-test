@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, ImgHTMLAttributes, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import {
   ArrowDownRight,
@@ -15,15 +15,31 @@ import {
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 
+const storageBaseUrl = (import.meta.env.VITE_STORAGE_BASE_URL || "https://luxhportf-emhvyngn.manus.space").replace(/\/$/, "");
+const pngAssetMap: Record<string, string> = {
+  "/manus-storage/concrete-villa_29404eb5.png": "/manus-storage/concrete-villa_8b33e82c.png",
+  "/manus-storage/dusk-office_d271c1a9.jpg": "/manus-storage/dusk-office_7e011321.png",
+  "/manus-storage/warm-interior_d31e41d1.webp": "/manus-storage/warm-interior_ebbc2b0f.png",
+  "/manus-storage/coastal-villa_c80f7922.jpg": "/manus-storage/coastal-villa_3c2e01d4.png",
+  "/manus-storage/modern-house_7b9e5ca5.jpg": "/manus-storage/modern-house_3b15e7ae.png",
+  "/manus-storage/mori-detail_70f623f8.webp": "/manus-storage/mori-detail_bd603082.png",
+  "/manus-storage/warm-detail_d406188d.jpg": "/manus-storage/warm-detail_05edd34e.png",
+  "/manus-storage/dusk-detail_36a912d3.jpg": "/manus-storage/dusk-detail_6237e03b.png",
+};
+const storageUrl = (path: string) => {
+  const resolvedPath = pngAssetMap[path] ?? path;
+  return resolvedPath.startsWith("/manus-storage/") ? `${storageBaseUrl}${resolvedPath}` : resolvedPath;
+};
+
 const images = {
-  villa: "/manus-storage/concrete-villa_29404eb5.png",
-  office: "/manus-storage/dusk-office_d271c1a9.jpg",
-  interior: "/manus-storage/warm-interior_d31e41d1.webp",
-  coastal: "/manus-storage/coastal-villa_c80f7922.jpg",
-  modern: "/manus-storage/modern-house_7b9e5ca5.jpg",
-  moriDetail: "/manus-storage/mori-detail_70f623f8.webp",
-  warmDetail: "/manus-storage/warm-detail_d406188d.jpg",
-  duskDetail: "/manus-storage/dusk-detail_36a912d3.jpg",
+  villa: storageUrl("/manus-storage/concrete-villa_8b33e82c.png"),
+  office: storageUrl("/manus-storage/dusk-office_7e011321.png"),
+  interior: storageUrl("/manus-storage/warm-interior_ebbc2b0f.png"),
+  coastal: storageUrl("/manus-storage/coastal-villa_3c2e01d4.png"),
+  modern: storageUrl("/manus-storage/modern-house_3b15e7ae.png"),
+  moriDetail: storageUrl("/manus-storage/mori-detail_bd603082.png"),
+  warmDetail: storageUrl("/manus-storage/warm-detail_05edd34e.png"),
+  duskDetail: storageUrl("/manus-storage/dusk-detail_6237e03b.png"),
 };
 
 type Project = {
@@ -133,6 +149,36 @@ const projects: Project[] = [
     floorPlan: "/manus-storage/field-notes-floor-plan_f62b0fb1.svg",
     pdf: "/manus-storage/field-notes-project_bc210007.pdf",
   },
+  {
+    slug: "atelier-common",
+    title: "Atelier Common",
+    category: "Branding",
+    image: images.duskDetail,
+    year: "2024",
+    location: "Phnom Penh, Cambodia",
+    client: "Atelier Common",
+    description: "A quiet identity system for a shared creative space, balancing editorial detail with a strong architectural rhythm.",
+    note: "Brand identity · Strategy + digital",
+    size: "standard",
+    gallery: [images.duskDetail, images.warmDetail, images.interior],
+    floorPlan: "",
+    pdf: "",
+  },
+  {
+    slug: "courtyard-study",
+    title: "Courtyard Study",
+    category: "Interior",
+    image: images.warmDetail,
+    year: "2023",
+    location: "Phnom Penh, Cambodia",
+    client: "Private client",
+    description: "An interior study organized around filtered daylight, textured surfaces, and a compact central courtyard.",
+    note: "Interior concept · 140 m²",
+    size: "wide",
+    gallery: [images.warmDetail, images.interior, images.villa],
+    floorPlan: "",
+    pdf: "",
+  },
 ];
 
 type PersistedProject = {
@@ -143,26 +189,38 @@ type PersistedProject = {
 
 function mapPersistedProject(item: PersistedProject): Project {
   const gallery = item.gallery.filter((asset) => asset.kind === "gallery").map((asset) => asset.url);
+  const coverImage = item.slug === "house-14" ? images.villa : storageUrl(item.imageUrl);
   return {
     slug: item.slug,
     title: item.title,
     category: item.category as Project["category"],
-    image: item.imageUrl,
+    image: coverImage,
     year: item.year,
     location: item.location,
     client: item.client,
     description: item.description,
     note: item.note,
     size: item.sortOrder % 3 === 2 ? "tall" : item.sortOrder % 3 === 0 ? "standard" : "wide",
-    gallery: gallery.length ? gallery : [item.imageUrl],
-    floorPlan: item.floorPlanUrl ?? "",
-    pdf: item.pdfUrl ?? "",
+    gallery: gallery.length ? gallery.map(storageUrl) : [coverImage],
+    floorPlan: storageUrl(item.floorPlanUrl ?? ""),
+    pdf: storageUrl(item.pdfUrl ?? ""),
   };
+}
+
+function SafeImage({ src, fallbackSrc = images.villa, alt, ...props }: ImgHTMLAttributes<HTMLImageElement> & { fallbackSrc?: string }) {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  useEffect(() => setCurrentSrc(src), [src]);
+  return <img {...props} src={currentSrc} alt={alt} onError={() => currentSrc !== fallbackSrc && setCurrentSrc(fallbackSrc)} />;
 }
 
 function usePortfolioProjects() {
   const query = trpc.projects.list.useQuery(undefined, { retry: 1 });
-  return { ...query, projects: query.data?.length ? query.data.map(mapPersistedProject) : projects };
+  const persistedProjects = query.data?.map(mapPersistedProject) ?? [];
+  const persistedSlugs = new Set(persistedProjects.map((project) => project.slug));
+  const mergedProjects = persistedProjects.length
+    ? [...persistedProjects, ...projects.filter((project) => !persistedSlugs.has(project.slug))]
+    : projects;
+  return { ...query, projects: mergedProjects };
 }
 
 const services = [
@@ -278,7 +336,7 @@ function ProjectCard({ project, featured = false }: { project: Project; featured
   return (
     <Link href={`/projects/${project.slug}`} className={`project-card ${featured ? "project-card-featured" : ""}`}>
       <div className="project-image-wrap">
-        <img src={project.image} alt={project.title} className="project-image" />
+        <SafeImage src={project.image} alt={project.title} className="project-image" />
         <div className="project-image-overlay" />
         <span className="project-view">View project <ArrowUpRight size={16} /></span>
       </div>
@@ -355,7 +413,7 @@ function GallerySection() {
         <div className="gallery-grid">
           {filtered.map((project) => (
             <div key={project.slug} className={`gallery-tile gallery-tile-${project.size}`}>
-              <button type="button" className="gallery-image-button" onClick={() => setLightbox(project)} aria-label={`Open ${project.title} image`}><img src={project.image} alt={project.title} /></button>
+              <button type="button" className="gallery-image-button" onClick={() => setLightbox(project)} aria-label={`Open ${project.title} image`}><SafeImage src={project.image} alt={project.title} /></button>
               <div className="gallery-tile-overlay"><div><span>{project.title}</span><small>{project.category} · {project.year}</small></div><Link href={`/projects/${project.slug}`} className="gallery-project-link">View project <ArrowUpRight size={14} /></Link></div>
             </div>
           ))}
@@ -367,7 +425,7 @@ function GallerySection() {
           <button type="button" className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Close image preview"><X size={24} /></button>
           {filtered.length > 1 && <><button type="button" className="lightbox-nav lightbox-prev" onClick={showPrevious} aria-label="Previous image"><ChevronLeft size={28} /></button><button type="button" className="lightbox-nav lightbox-next" onClick={showNext} aria-label="Next image"><ChevronRight size={28} /></button></>}
           <div className="lightbox-frame" onClick={(event) => event.stopPropagation()}>
-            <img src={lightbox.image} alt={lightbox.title} />
+            <SafeImage src={lightbox.image} alt={lightbox.title} />
             <div className="lightbox-caption"><div><strong>{lightbox.title}</strong><span>{lightbox.category} · {lightbox.year}</span></div><Link href={`/projects/${lightbox.slug}`} onClick={() => setLightbox(null)}>View project <ArrowUpRight size={16} /></Link></div>
           </div>
           {filtered.length > 1 && <div className="swipe-hint"><span>←</span> Swipe to explore <span>→</span></div>}
@@ -391,7 +449,7 @@ export function Home() {
             <Link href="/projects" className="button button-light">View projects <MoveRight size={17} /></Link>
           </div>
         </div>
-        <div className="hero-image"><img src={images.villa} alt="Modern concrete residence by LUXH Works" /><div className="hero-image-caption"><span>01 — House 14</span><span>2024</span></div></div>
+        <div className="hero-image"><SafeImage src={images.villa} alt="Modern concrete residence by LUXH Works" /><div className="hero-image-caption"><span>01 — House 14</span><span>2024</span></div></div>
         <a href="#intro" className="hero-scroll">Scroll to explore <ArrowDownRight size={16} /></a>
       </section>
 
@@ -447,7 +505,7 @@ export function AboutPage() {
         <p className="page-hero-copy">We bring architecture and visual communication into the same conversation—because the strongest ideas deserve to be felt from every angle.</p>
       </section>
       <section className="about-story">
-        <div className="about-image"><img src={images.coastal} alt="Coastal architectural project" /><span>On site / Phan Thiet, 2023</span></div>
+        <div className="about-image"><SafeImage src={images.coastal} alt="Coastal architectural project" /><span>On site / Phan Thiet, 2023</span></div>
         <div className="about-copy"><SectionLabel number="01">The studio / Ho Chi Minh City</SectionLabel><h2>Design with<br /><em>a pulse.</em></h2><p>LUXH Works was founded on the belief that restraint can be memorable. We partner with private clients, developers, and cultural brands to make places and visual systems that feel as good as they look.</p><p>Our process is collaborative and exacting. We combine close listening with a deep respect for material, context, and the everyday rituals that give a project its life.</p><Link href="/contact" className="text-link">Work with us <ArrowUpRight size={16} /></Link></div>
       </section>
       <section className="founder"><div className="founder-title"><SectionLabel number="02" dark>Founder / Designer</SectionLabel><h2>Lin<strong>h</strong><br /><em>Nguyen.</em></h2></div><div className="founder-content"><p className="large-copy">An architect and creative director with an eye for the spaces between precision and feeling.</p><div className="founder-details"><div><span>Background</span><p>Architecture and visual design across residential, hospitality, and cultural projects.</p></div><div><span>Education</span><p>B.Arch, Ho Chi Minh City University of Architecture, 2015.</p></div><div><span>Experience</span><p>Independent practice since 2018, with work featured across Vietnam and Southeast Asia.</p></div></div></div></section>
@@ -495,9 +553,9 @@ export function ProjectDetailPage() {
   return (
     <PageShell>
       <section className="project-detail-hero"><Link href="/projects" className="back-link"><ChevronLeft size={17} /> All projects</Link><p className="eyebrow">{project.category} / {project.year}</p><h1>{project.title}</h1><div className="project-detail-meta"><div><span>Location</span><p>{project.location}</p></div><div><span>Client</span><p>{project.client}</p></div><div><span>Scope</span><p>{project.note}</p></div></div></section>
-      <section className="project-detail-image project-main-image"><img src={project.image} alt={project.title} /></section>
+      <section className="project-detail-image project-main-image"><SafeImage src={project.image} alt={project.title} /></section>
       <section className="project-narrative"><div><SectionLabel number="Project story">A deliberate response</SectionLabel></div><div><p className="large-copy">{project.description}</p><p>Every project begins with a close reading of its context—the site, the brief, the people who will use it. We turn those findings into a clear design language, testing each decision against the experience it creates.</p><p>Here, a limited palette and a sequence of framed openings became the foundation for an atmosphere that is both composed and generous.</p></div></section>
-      <section className="project-detail-gallery">{project.gallery.map((image, index) => <figure key={image} className={index === 0 ? "project-detail-gallery-featured" : ""}><img src={image} alt={`${project.title} detail ${index + 1}`} /><figcaption>{index === 0 ? "Material and proportion" : index === 1 ? "Atmosphere study" : "A considered frame"}</figcaption></figure>)}</section>
+      <section className="project-detail-gallery">{project.gallery.map((image, index) => <figure key={image} className={index === 0 ? "project-detail-gallery-featured" : ""}><SafeImage src={image} alt={`${project.title} detail ${index + 1}`} /><figcaption>{index === 0 ? "Material and proportion" : index === 1 ? "Atmosphere study" : "A considered frame"}</figcaption></figure>)}</section>
       <section className="project-resources"><div><SectionLabel number="Project resources">Drawings & documentation</SectionLabel><h2>See the thinking<br /><em>behind the frame.</em></h2></div><div className="resource-actions"><a href={project.floorPlan} target="_blank" rel="noreferrer" className="resource-card"><span>01 / Drawing</span><strong>Floor plan</strong><small>Open plan →</small></a><a href={project.pdf} download className="resource-card resource-card-accent"><span>02 / Document</span><strong>Project PDF</strong><small>Download PDF →</small></a></div></section>
       <section className="project-sharing"><div><SectionLabel number="Share project">Pass it on</SectionLabel><p>Know someone who would enjoy this direction?</p></div><div className="share-actions"><button type="button" onClick={handleShare}><Share2 size={15} />{shareStatus || "Share"}</button><a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer">LinkedIn <ArrowUpRight size={14} /></a><a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`} target="_blank" rel="noreferrer">Facebook <ArrowUpRight size={14} /></a></div></section>
       <section className="related"><SectionLabel number="Related work">Continue exploring</SectionLabel><div className="related-grid">{related.map((item) => <ProjectCard key={item.slug} project={item} />)}</div></section>
