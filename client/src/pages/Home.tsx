@@ -230,6 +230,71 @@ function ProjectCard({ project, featured = false }: { project: Project; featured
   );
 }
 
+function GallerySection() {
+  const [filter, setFilter] = useState("All");
+  const [lightbox, setLightbox] = useState<Project | null>(null);
+  const filters = ["All", "Architecture", "Interior", "3D Visualization", "Graphic Design", "Branding"];
+  const filtered = useMemo(
+    () => filter === "All" ? projects : projects.filter((project) => project.category === filter),
+    [filter],
+  );
+
+  useEffect(() => {
+    const nodes = document.querySelectorAll<HTMLElement>(".gallery-tile");
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((entry) => entry.isIntersecting && entry.target.classList.add("gallery-tile-visible")),
+      { threshold: 0.12 },
+    );
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [filter]);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setLightbox(null);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [lightbox]);
+
+  return (
+    <>
+      <section className="visual-gallery" id="gallery">
+        <div className="visual-gallery-head">
+          <SectionLabel number="05">Visual journal / Details in context</SectionLabel>
+          <Link href="/projects" className="text-link">Open the full gallery <ArrowUpRight size={16} /></Link>
+        </div>
+        <div className="gallery-filter-row" role="group" aria-label="Filter gallery by category">
+          {filters.map((item) => <button key={item} className={filter === item ? "gallery-filter-active" : ""} onClick={() => setFilter(item)}>{item}</button>)}
+        </div>
+        <div className="gallery-grid">
+          {filtered.map((project) => (
+            <button type="button" key={project.slug} className={`gallery-tile gallery-tile-${project.size}`} onClick={() => setLightbox(project)} aria-label={`View ${project.title} image`}>
+              <img src={project.image} alt={project.title} />
+              <div><span>{project.title}</span><small>{project.category} · {project.year}</small></div>
+            </button>
+          ))}
+        </div>
+        {filtered.length === 0 && <p className="gallery-empty">More work in this discipline is on its way.</p>}
+      </section>
+      {lightbox && (
+        <div className="lightbox" role="dialog" aria-modal="true" aria-label={`${lightbox.title} preview`} onClick={() => setLightbox(null)}>
+          <button type="button" className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Close image preview"><X size={24} /></button>
+          <div className="lightbox-frame" onClick={(event) => event.stopPropagation()}>
+            <img src={lightbox.image} alt={lightbox.title} />
+            <div className="lightbox-caption"><div><strong>{lightbox.title}</strong><span>{lightbox.category} · {lightbox.year}</span></div><Link href={`/projects/${lightbox.slug}`} onClick={() => setLightbox(null)}>View project <ArrowUpRight size={16} /></Link></div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function Home() {
   return (
     <PageShell>
@@ -279,18 +344,7 @@ export function Home() {
         </div>
       </section>
 
-      <section className="visual-gallery">
-        <div className="visual-gallery-head">
-          <SectionLabel number="05">Visual journal / Details in context</SectionLabel>
-          <Link href="/projects" className="text-link">Open the full gallery <ArrowUpRight size={16} /></Link>
-        </div>
-        <div className="gallery-grid">
-          <Link href="/projects/house-14" className="gallery-tile gallery-tile-large"><img src={images.villa} alt="Concrete House 14 exterior" /><div><span>House 14</span><small>Architecture · 2024</small></div></Link>
-          <Link href="/projects/mori-residence" className="gallery-tile gallery-tile-small"><img src={images.interior} alt="Mori Residence interior" /><div><span>Mori Residence</span><small>Interior · 2024</small></div></Link>
-          <Link href="/projects/northpoint" className="gallery-tile gallery-tile-wide"><img src={images.office} alt="Northpoint architectural visualization" /><div><span>Northpoint</span><small>3D Visualization · 2023</small></div></Link>
-          <Link href="/projects/seascape-house" className="gallery-tile gallery-tile-small"><img src={images.coastal} alt="Seascape House by the coast" /><div><span>Seascape House</span><small>Architecture · 2023</small></div></Link>
-        </div>
-      </section>
+      <GallerySection />
 
       <CTA />
     </PageShell>
