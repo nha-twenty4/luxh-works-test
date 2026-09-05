@@ -229,7 +229,7 @@ function Header() {
     <header className={`site-header ${isHomeTop ? "header-on-hero" : "header-solid"}`}>
       <div className="header-inner">
         <Link href="/" className="brand" aria-label="LUXH Works home">
-          <span>LUXH</span><i>WORKS</i>
+          <span style={{ fontSize: "50px" }}>LUXH</span><i style={{ fontSize: "50px" }}>WORKS</i>
         </Link>
         <nav className="desktop-nav" aria-label="Main navigation">
           {navItems.map(([label, href]) => (
