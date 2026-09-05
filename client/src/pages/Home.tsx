@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 const images = {
   villa: "/manus-storage/concrete-villa_29404eb5.png",
@@ -133,6 +134,36 @@ const projects: Project[] = [
     pdf: "/manus-storage/field-notes-project_bc210007.pdf",
   },
 ];
+
+type PersistedProject = {
+  slug: string; title: string; category: string; imageUrl: string; year: string; location: string; client: string;
+  description: string; note: string; sortOrder: number; floorPlanUrl: string | null; pdfUrl: string | null;
+  gallery: Array<{ kind: string; url: string }>;
+};
+
+function mapPersistedProject(item: PersistedProject): Project {
+  const gallery = item.gallery.filter((asset) => asset.kind === "gallery").map((asset) => asset.url);
+  return {
+    slug: item.slug,
+    title: item.title,
+    category: item.category as Project["category"],
+    image: item.imageUrl,
+    year: item.year,
+    location: item.location,
+    client: item.client,
+    description: item.description,
+    note: item.note,
+    size: item.sortOrder % 3 === 2 ? "tall" : item.sortOrder % 3 === 0 ? "standard" : "wide",
+    gallery: gallery.length ? gallery : [item.imageUrl],
+    floorPlan: item.floorPlanUrl ?? "",
+    pdf: item.pdfUrl ?? "",
+  };
+}
+
+function usePortfolioProjects() {
+  const query = trpc.projects.list.useQuery(undefined, { retry: 1 });
+  return { ...query, projects: query.data?.length ? query.data.map(mapPersistedProject) : projects };
+}
 
 const services = [
   {
@@ -257,13 +288,14 @@ function ProjectCard({ project, featured = false }: { project: Project; featured
 }
 
 function GallerySection() {
+  const { projects: portfolioProjects } = usePortfolioProjects();
   const [filter, setFilter] = useState("All");
   const [lightbox, setLightbox] = useState<Project | null>(null);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const filters = ["All", "Architecture", "Interior", "3D Visualization", "Graphic Design", "Branding"];
   const filtered = useMemo(
-    () => filter === "All" ? projects : projects.filter((project) => project.category === filter),
-    [filter],
+    () => filter === "All" ? portfolioProjects : portfolioProjects.filter((project) => project.category === filter),
+    [filter, portfolioProjects],
   );
   const lightboxIndex = lightbox ? filtered.findIndex((project) => project.slug === lightbox.slug) : -1;
   const showPrevious = () => setLightbox(filtered[(lightboxIndex - 1 + filtered.length) % filtered.length]);
@@ -346,6 +378,7 @@ function GallerySection() {
 }
 
 export function Home() {
+  const { projects: portfolioProjects } = usePortfolioProjects();
   return (
     <PageShell>
       <section className="hero">
@@ -375,9 +408,9 @@ export function Home() {
         <SectionLabel number="02">Selected work / 2022—2024</SectionLabel>
         <div className="featured-head"><h2>Selected<br /><em>projects.</em></h2><Link href="/projects" className="text-link">Explore all work <ArrowUpRight size={16} /></Link></div>
         <div className="featured-grid">
-          <ProjectCard project={projects[0]} featured />
-          <ProjectCard project={projects[1]} />
-          <ProjectCard project={projects[2]} />
+          <ProjectCard project={portfolioProjects[0]} featured />
+          <ProjectCard project={portfolioProjects[1]} />
+          <ProjectCard project={portfolioProjects[2]} />
         </div>
       </section>
 
@@ -425,9 +458,10 @@ export function AboutPage() {
 }
 
 export function ProjectsPage() {
+  const { projects: portfolioProjects } = usePortfolioProjects();
   const [filter, setFilter] = useState("All");
   const filters = ["All", "Architecture", "Interior", "3D Visualization", "Graphic Design", "Branding"];
-  const filtered = useMemo(() => filter === "All" ? projects : projects.filter((project) => project.category === filter), [filter]);
+  const filtered = useMemo(() => filter === "All" ? portfolioProjects : portfolioProjects.filter((project) => project.category === filter), [filter, portfolioProjects]);
   return (
     <PageShell>
       <section className="page-hero projects-hero"><p className="eyebrow">Portfolio / Selected work</p><h1>Ideas made<br /><em>visible.</em></h1><p className="page-hero-copy">A selection of spaces, images, and identities shaped with care.</p></section>
@@ -443,8 +477,9 @@ export function ProjectsPage() {
 
 export function ProjectDetailPage() {
   const { slug } = useParams<{ slug: string }>();
-  const project = projects.find((item) => item.slug === slug) ?? projects[0];
-  const related = projects.filter((item) => item.slug !== project.slug).slice(0, 2);
+  const { projects: portfolioProjects } = usePortfolioProjects();
+  const project = portfolioProjects.find((item) => item.slug === slug) ?? portfolioProjects[0];
+  const related = portfolioProjects.filter((item) => item.slug !== project.slug).slice(0, 2);
   const [shareStatus, setShareStatus] = useState("");
   const shareUrl = typeof window !== "undefined" ? window.location.href : `/projects/${project.slug}`;
   const shareTitle = `${project.title} — LUXH Works`;
@@ -484,7 +519,27 @@ export function ServicesPage() {
 }
 
 export function ContactPage() {
-  const submitForm = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); event.currentTarget.reset(); toast.success("Thank you — we’ll be in touch shortly."); };
+  const submitInquiry = trpc.contact.submit.useMutation();
+  const submitForm = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    try {
+      await submitInquiry.mutateAsync({
+        name: String(values.get("name") ?? ""),
+        email: String(values.get("email") ?? ""),
+        phone: String(values.get("phone") ?? "") || undefined,
+        service: String(values.get("service") ?? ""),
+        details: String(values.get("details") ?? ""),
+        budget: String(values.get("budget") ?? "") || undefined,
+        timeline: String(values.get("timeline") ?? "") || undefined,
+      });
+      form.reset();
+      toast.success("Thank you — we’ll be in touch shortly.");
+    } catch {
+      toast.error("We could not save your inquiry. Please try again.");
+    }
+  };
   return (
     <PageShell>
       <section className="contact-hero"><p className="eyebrow eyebrow-light">Contact / New projects and thoughtful conversations</p><h1>Let's work<br /><em>together.</em></h1><div className="contact-intro"><p>Tell us a little about what you are making. We usually reply within two working days.</p><a href="mailto:hello@luxhworks.com" className="button button-light">hello@luxhworks.com <ArrowUpRight size={17} /></a></div><div className="contact-mark">LW</div></section>
