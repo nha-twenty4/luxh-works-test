@@ -279,6 +279,19 @@ export function Home() {
         </div>
       </section>
 
+      <section className="visual-gallery">
+        <div className="visual-gallery-head">
+          <SectionLabel number="05">Visual journal / Details in context</SectionLabel>
+          <Link href="/projects" className="text-link">Open the full gallery <ArrowUpRight size={16} /></Link>
+        </div>
+        <div className="gallery-grid">
+          <Link href="/projects/house-14" className="gallery-tile gallery-tile-large"><img src={images.villa} alt="Concrete House 14 exterior" /><div><span>House 14</span><small>Architecture · 2024</small></div></Link>
+          <Link href="/projects/mori-residence" className="gallery-tile gallery-tile-small"><img src={images.interior} alt="Mori Residence interior" /><div><span>Mori Residence</span><small>Interior · 2024</small></div></Link>
+          <Link href="/projects/northpoint" className="gallery-tile gallery-tile-wide"><img src={images.office} alt="Northpoint architectural visualization" /><div><span>Northpoint</span><small>3D Visualization · 2023</small></div></Link>
+          <Link href="/projects/seascape-house" className="gallery-tile gallery-tile-small"><img src={images.coastal} alt="Seascape House by the coast" /><div><span>Seascape House</span><small>Architecture · 2023</small></div></Link>
+        </div>
+      </section>
+
       <CTA />
     </PageShell>
   );
