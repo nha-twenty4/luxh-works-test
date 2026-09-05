@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import {
   ArrowDownRight,
@@ -19,6 +19,9 @@ const images = {
   interior: "/manus-storage/warm-interior_d31e41d1.webp",
   coastal: "/manus-storage/coastal-villa_c80f7922.jpg",
   modern: "/manus-storage/modern-house_7b9e5ca5.jpg",
+  moriDetail: "/manus-storage/mori-detail_70f623f8.webp",
+  warmDetail: "/manus-storage/warm-detail_d406188d.jpg",
+  duskDetail: "/manus-storage/dusk-detail_36a912d3.jpg",
 };
 
 type Project = {
@@ -32,6 +35,9 @@ type Project = {
   description: string;
   note: string;
   size: "wide" | "tall" | "standard";
+  gallery: string[];
+  floorPlan: string;
+  pdf: string;
 };
 
 const projects: Project[] = [
@@ -46,6 +52,9 @@ const projects: Project[] = [
     description: "A restrained concrete residence shaped around garden views, deep overhangs, and a continuous threshold between living space and landscape.",
     note: "Private residence · 420 m²",
     size: "wide",
+    gallery: [images.villa, images.modern, images.coastal],
+    floorPlan: "/manus-storage/house-14-floor-plan_05ca90c2.svg",
+    pdf: "/manus-storage/house-14-project_ec10947f.pdf",
   },
   {
     slug: "mori-residence",
@@ -58,6 +67,9 @@ const projects: Project[] = [
     description: "A study in warm minimalism: tactile timber, quiet limestone, and soft-edged forms designed for a slower daily rhythm.",
     note: "Residential interior · 185 m²",
     size: "tall",
+    gallery: [images.interior, images.moriDetail, images.warmDetail],
+    floorPlan: "/manus-storage/mori-residence-floor-plan_57bfcfc8.svg",
+    pdf: "/manus-storage/mori-residence-project_87783d74.pdf",
   },
   {
     slug: "northpoint",
@@ -70,6 +82,9 @@ const projects: Project[] = [
     description: "A dusk visualization series translating an urban mixed-use concept into a cinematic, human-scale visual narrative.",
     note: "Visualization · Mixed-use",
     size: "standard",
+    gallery: [images.office, images.duskDetail, images.modern],
+    floorPlan: "/manus-storage/northpoint-floor-plan_af0cdc34.svg",
+    pdf: "/manus-storage/northpoint-project_2e1cfef3.pdf",
   },
   {
     slug: "seascape-house",
@@ -82,6 +97,9 @@ const projects: Project[] = [
     description: "A low coastal retreat composed as a sequence of sheltered courtyards, framing the horizon without competing with it.",
     note: "Holiday house · 360 m²",
     size: "tall",
+    gallery: [images.coastal, images.villa, images.warmDetail],
+    floorPlan: "/manus-storage/seascape-house-floor-plan_ae136de4.svg",
+    pdf: "/manus-storage/seascape-house-project_a2e250e4.pdf",
   },
   {
     slug: "frame-house",
@@ -94,6 +112,9 @@ const projects: Project[] = [
     description: "A crisp composition of planes, voids, and framed light, made to feel at once precise and deeply domestic.",
     note: "Private residence · 310 m²",
     size: "standard",
+    gallery: [images.modern, images.villa, images.coastal],
+    floorPlan: "/manus-storage/frame-house-floor-plan_20d4b933.svg",
+    pdf: "/manus-storage/frame-house-project_2667e720.pdf",
   },
   {
     slug: "field-notes",
@@ -106,6 +127,9 @@ const projects: Project[] = [
     description: "An editorial identity system for a small collection of observations on material, shadow, and everyday space.",
     note: "Editorial identity · Print + digital",
     size: "wide",
+    gallery: [images.interior, images.moriDetail, images.duskDetail],
+    floorPlan: "/manus-storage/field-notes-floor-plan_f62b0fb1.svg",
+    pdf: "/manus-storage/field-notes-project_bc210007.pdf",
   },
 ];
 
@@ -234,6 +258,7 @@ function ProjectCard({ project, featured = false }: { project: Project; featured
 function GallerySection() {
   const [filter, setFilter] = useState("All");
   const [lightbox, setLightbox] = useState<Project | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const filters = ["All", "Architecture", "Interior", "3D Visualization", "Graphic Design", "Branding"];
   const filtered = useMemo(
     () => filter === "All" ? projects : projects.filter((project) => project.category === filter),
@@ -242,6 +267,22 @@ function GallerySection() {
   const lightboxIndex = lightbox ? filtered.findIndex((project) => project.slug === lightbox.slug) : -1;
   const showPrevious = () => setLightbox(filtered[(lightboxIndex - 1 + filtered.length) % filtered.length]);
   const showNext = () => setLightbox(filtered[(lightboxIndex + 1) % filtered.length]);
+  const onTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a")) return;
+    const touch = event.changedTouches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const onTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (!touchStart.current || filtered.length < 2) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStart.current.x;
+    const deltaY = touch.clientY - touchStart.current.y;
+    touchStart.current = null;
+    if (Math.abs(deltaX) < 45 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    if (deltaX < 0) showNext();
+    else showPrevious();
+  };
 
   useEffect(() => {
     const nodes = document.querySelectorAll<HTMLElement>(".gallery-tile");
@@ -289,7 +330,7 @@ function GallerySection() {
         {filtered.length === 0 && <p className="gallery-empty">More work in this discipline is on its way.</p>}
       </section>
       {lightbox && (
-        <div className="lightbox" role="dialog" aria-modal="true" aria-label={`${lightbox.title} preview`} onClick={() => setLightbox(null)}>
+        <div className="lightbox" role="dialog" aria-modal="true" aria-label={`${lightbox.title} preview`} onClick={() => setLightbox(null)} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           <button type="button" className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Close image preview"><X size={24} /></button>
           {filtered.length > 1 && <><button type="button" className="lightbox-nav lightbox-prev" onClick={showPrevious} aria-label="Previous image"><ChevronLeft size={28} /></button><button type="button" className="lightbox-nav lightbox-next" onClick={showNext} aria-label="Next image"><ChevronRight size={28} /></button></>}
           <div className="lightbox-frame" onClick={(event) => event.stopPropagation()}>
@@ -402,13 +443,13 @@ export function ProjectDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const project = projects.find((item) => item.slug === slug) ?? projects[0];
   const related = projects.filter((item) => item.slug !== project.slug).slice(0, 2);
-  const detailImages = Array.from(new Set([project.image, images.modern, images.interior, images.office]));
   return (
     <PageShell>
       <section className="project-detail-hero"><Link href="/projects" className="back-link"><ChevronLeft size={17} /> All projects</Link><p className="eyebrow">{project.category} / {project.year}</p><h1>{project.title}</h1><div className="project-detail-meta"><div><span>Location</span><p>{project.location}</p></div><div><span>Client</span><p>{project.client}</p></div><div><span>Scope</span><p>{project.note}</p></div></div></section>
       <section className="project-detail-image project-main-image"><img src={project.image} alt={project.title} /></section>
       <section className="project-narrative"><div><SectionLabel number="Project story">A deliberate response</SectionLabel></div><div><p className="large-copy">{project.description}</p><p>Every project begins with a close reading of its context—the site, the brief, the people who will use it. We turn those findings into a clear design language, testing each decision against the experience it creates.</p><p>Here, a limited palette and a sequence of framed openings became the foundation for an atmosphere that is both composed and generous.</p></div></section>
-      <section className="project-detail-gallery">{detailImages.slice(1, 4).map((image, index) => <figure key={image} className={index === 0 ? "project-detail-gallery-featured" : ""}><img src={image} alt={`${project.title} detail ${index + 1}`} /><figcaption>{index === 0 ? "Material and proportion" : index === 1 ? "Atmosphere study" : "A considered frame"}</figcaption></figure>)}</section>
+      <section className="project-detail-gallery">{project.gallery.map((image, index) => <figure key={image} className={index === 0 ? "project-detail-gallery-featured" : ""}><img src={image} alt={`${project.title} detail ${index + 1}`} /><figcaption>{index === 0 ? "Material and proportion" : index === 1 ? "Atmosphere study" : "A considered frame"}</figcaption></figure>)}</section>
+      <section className="project-resources"><div><SectionLabel number="Project resources">Drawings & documentation</SectionLabel><h2>See the thinking<br /><em>behind the frame.</em></h2></div><div className="resource-actions"><a href={project.floorPlan} target="_blank" rel="noreferrer" className="resource-card"><span>01 / Drawing</span><strong>Floor plan</strong><small>Open plan →</small></a><a href={project.pdf} download className="resource-card resource-card-accent"><span>02 / Document</span><strong>Project PDF</strong><small>Download PDF →</small></a></div></section>
       <section className="related"><SectionLabel number="Related work">Continue exploring</SectionLabel><div className="related-grid">{related.map((item) => <ProjectCard key={item.slug} project={item} />)}</div></section>
     </PageShell>
   );
