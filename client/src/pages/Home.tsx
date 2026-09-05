@@ -5,6 +5,7 @@ import {
   ArrowUpRight,
   Check,
   ChevronLeft,
+  ChevronRight,
   Menu,
   MoveRight,
   Plus,
@@ -238,6 +239,9 @@ function GallerySection() {
     () => filter === "All" ? projects : projects.filter((project) => project.category === filter),
     [filter],
   );
+  const lightboxIndex = lightbox ? filtered.findIndex((project) => project.slug === lightbox.slug) : -1;
+  const showPrevious = () => setLightbox(filtered[(lightboxIndex - 1 + filtered.length) % filtered.length]);
+  const showNext = () => setLightbox(filtered[(lightboxIndex + 1) % filtered.length]);
 
   useEffect(() => {
     const nodes = document.querySelectorAll<HTMLElement>(".gallery-tile");
@@ -253,6 +257,8 @@ function GallerySection() {
     if (!lightbox) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setLightbox(null);
+      if (event.key === "ArrowLeft" && filtered.length > 1) showPrevious();
+      if (event.key === "ArrowRight" && filtered.length > 1) showNext();
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
@@ -260,7 +266,7 @@ function GallerySection() {
       document.body.style.overflow = "";
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [lightbox]);
+  }, [lightbox, filtered, lightboxIndex]);
 
   return (
     <>
@@ -274,10 +280,10 @@ function GallerySection() {
         </div>
         <div className="gallery-grid">
           {filtered.map((project) => (
-            <button type="button" key={project.slug} className={`gallery-tile gallery-tile-${project.size}`} onClick={() => setLightbox(project)} aria-label={`View ${project.title} image`}>
-              <img src={project.image} alt={project.title} />
-              <div><span>{project.title}</span><small>{project.category} · {project.year}</small></div>
-            </button>
+            <div key={project.slug} className={`gallery-tile gallery-tile-${project.size}`}>
+              <button type="button" className="gallery-image-button" onClick={() => setLightbox(project)} aria-label={`Open ${project.title} image`}><img src={project.image} alt={project.title} /></button>
+              <div className="gallery-tile-overlay"><div><span>{project.title}</span><small>{project.category} · {project.year}</small></div><Link href={`/projects/${project.slug}`} className="gallery-project-link">View project <ArrowUpRight size={14} /></Link></div>
+            </div>
           ))}
         </div>
         {filtered.length === 0 && <p className="gallery-empty">More work in this discipline is on its way.</p>}
@@ -285,6 +291,7 @@ function GallerySection() {
       {lightbox && (
         <div className="lightbox" role="dialog" aria-modal="true" aria-label={`${lightbox.title} preview`} onClick={() => setLightbox(null)}>
           <button type="button" className="lightbox-close" onClick={() => setLightbox(null)} aria-label="Close image preview"><X size={24} /></button>
+          {filtered.length > 1 && <><button type="button" className="lightbox-nav lightbox-prev" onClick={showPrevious} aria-label="Previous image"><ChevronLeft size={28} /></button><button type="button" className="lightbox-nav lightbox-next" onClick={showNext} aria-label="Next image"><ChevronRight size={28} /></button></>}
           <div className="lightbox-frame" onClick={(event) => event.stopPropagation()}>
             <img src={lightbox.image} alt={lightbox.title} />
             <div className="lightbox-caption"><div><strong>{lightbox.title}</strong><span>{lightbox.category} · {lightbox.year}</span></div><Link href={`/projects/${lightbox.slug}`} onClick={() => setLightbox(null)}>View project <ArrowUpRight size={16} /></Link></div>
@@ -395,12 +402,13 @@ export function ProjectDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const project = projects.find((item) => item.slug === slug) ?? projects[0];
   const related = projects.filter((item) => item.slug !== project.slug).slice(0, 2);
+  const detailImages = Array.from(new Set([project.image, images.modern, images.interior, images.office]));
   return (
     <PageShell>
       <section className="project-detail-hero"><Link href="/projects" className="back-link"><ChevronLeft size={17} /> All projects</Link><p className="eyebrow">{project.category} / {project.year}</p><h1>{project.title}</h1><div className="project-detail-meta"><div><span>Location</span><p>{project.location}</p></div><div><span>Client</span><p>{project.client}</p></div><div><span>Scope</span><p>{project.note}</p></div></div></section>
       <section className="project-detail-image project-main-image"><img src={project.image} alt={project.title} /></section>
       <section className="project-narrative"><div><SectionLabel number="Project story">A deliberate response</SectionLabel></div><div><p className="large-copy">{project.description}</p><p>Every project begins with a close reading of its context—the site, the brief, the people who will use it. We turn those findings into a clear design language, testing each decision against the experience it creates.</p><p>Here, a limited palette and a sequence of framed openings became the foundation for an atmosphere that is both composed and generous.</p></div></section>
-      <section className="project-pair"><img src={images.modern} alt="Architectural detail" /><div><img src={images.interior} alt="Interior material palette" /><p>Light, material, and scale are considered together from the first line to the final image.</p></div></section>
+      <section className="project-detail-gallery">{detailImages.slice(1, 4).map((image, index) => <figure key={image} className={index === 0 ? "project-detail-gallery-featured" : ""}><img src={image} alt={`${project.title} detail ${index + 1}`} /><figcaption>{index === 0 ? "Material and proportion" : index === 1 ? "Atmosphere study" : "A considered frame"}</figcaption></figure>)}</section>
       <section className="related"><SectionLabel number="Related work">Continue exploring</SectionLabel><div className="related-grid">{related.map((item) => <ProjectCard key={item.slug} project={item} />)}</div></section>
     </PageShell>
   );
